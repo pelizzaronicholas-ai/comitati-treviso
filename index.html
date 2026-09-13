@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comitati di TREVISO</title>
+<link rel="icon" type="image/png" href="assets/logo-fn.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <img class="logo" id="app-logo" src="assets/logo-fn.png" alt="Logo Futuro Nazionale">
+  <div class="titles">
+    <h1>Comitati di TREVISO</h1>
+    <p>Rete dei comitati territoriali Futuro Nazionale — Provincia di Treviso</p>
+  </div>
+  <div class="whoami">
+    <span>Sei:</span>
+    <select id="whoami-select"><option value="">Seleziona il tuo nome…</option></select>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="mappa">Mappa &amp; Rubrica</button>
+  <button class="tab-btn" data-tab="eventi">Eventi</button>
+  <button class="tab-btn" data-tab="messaggi">Messaggi</button>
+</nav>
+
+<!-- ===================== TAB: MAPPA & RUBRICA ===================== -->
+<section class="tab-panel active" id="tab-mappa">
+  <div class="layout">
+    <div id="detail" class="card detail empty" style="flex:1 1 100%;">
+      Seleziona un comitato dalla lista o dalla mappa per vedere i dettagli.
+    </div>
+    <div class="map-panel card">
+      <div id="map"></div>
+    </div>
+    <div class="list-panel card">
+      <div class="list-toolbar">
+        <input type="search" id="search-box" placeholder="Cerca comune o referente…">
+      </div>
+      <div id="list"></div>
+      <div class="bulkbar">
+        <span class="count" id="sel-count">0 selezionati</span>
+        <button class="btn" id="sel-all">Seleziona tutti</button>
+        <button class="btn" id="sel-none">Deseleziona</button>
+        <button class="btn primary" id="bulk-email">✉️ Email ai selezionati</button>
+        <button class="btn accent" id="bulk-wa">WhatsApp ai selezionati</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAB: EVENTI ===================== -->
+<section class="tab-panel" id="tab-eventi">
+  <div id="eventi-fb-notice"></div>
+  <div class="layout">
+    <div class="card" style="flex:1 1 320px;">
+      <h3 style="margin-top:0;">Nuovo evento</h3>
+      <form class="stack" id="event-form">
+        <label>Titolo</label>
+        <input type="text" id="ev-title" required placeholder="Es. Presidio in piazza">
+        <label>Data e ora</label>
+        <input type="datetime-local" id="ev-date" required>
+        <label>Luogo</label>
+        <input type="text" id="ev-place" placeholder="Es. Piazza dei Signori, Treviso">
+        <label>Descrizione</label>
+        <textarea id="ev-desc" rows="3" placeholder="Dettagli per i referenti…"></textarea>
+        <label>Destinatari</label>
+        <select id="ev-target-type">
+          <option value="all">Tutti i comitati</option>
+          <option value="city">Un comune specifico</option>
+          <option value="selection">Solo i comitati selezionati in Rubrica</option>
+        </select>
+        <select id="ev-target-city" style="display:none;"></select>
+        <label>Locandina (opzionale)</label>
+        <input type="file" id="ev-poster" accept="image/*">
+        <img id="ev-poster-preview" alt="Anteprima locandina">
+        <button type="submit" class="btn primary">Crea evento</button>
+      </form>
+    </div>
+    <div class="card" style="flex:2 1 420px;">
+      <h3 style="margin-top:0;">Eventi in programma</h3>
+      <div id="events-list"><p class="detail empty">Nessun evento ancora.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAB: MESSAGGI ===================== -->
+<section class="tab-panel" id="tab-messaggi">
+  <div id="chat-fb-notice"></div>
+  <div class="card" style="max-width:640px;">
+    <h3 style="margin-top:0;">Bacheca interna</h3>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:-6px;">
+      Visibile a tutti i referenti collegati all'app. Non sostituisce WhatsApp/telefono per le urgenze.
+    </p>
+    <div class="chat-box">
+      <div class="chat-msgs" id="chat-msgs"></div>
+      <div class="chat-input">
+        <input type="text" id="chat-text" placeholder="Scrivi un messaggio…">
+        <button class="btn primary" id="chat-send">Invia</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Leaflet (mappa con basemap OpenStreetMap reale) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Firebase SDK (compat, va bene per un uso semplice senza build step) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+<script src="data.js"></script>
+<script src="firebase-config.js"></script>
+<script src="map.js"></script>
+<script src="rubrica.js"></script>
+<script src="eventi.js"></script>
+<script src="messaggi.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
