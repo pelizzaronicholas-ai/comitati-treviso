@@ -47,7 +47,8 @@ service cloud.firestore {
       allow create: if request.resource.data.text is string
                      && request.resource.data.text.size() > 0
                      && request.resource.data.text.size() < 1000;
-      allow update, delete: if false;
+      allow delete: if true;
+      allow update: if false;
     }
   }
 }
@@ -91,3 +92,4 @@ Nel form "Nuovo evento" puoi allegare un'immagine (JPG/PNG). Viene compressa nel
 - **Messenger**: non integrato — servirebbe lo username Facebook di ogni referente, che non abbiamo.
 - **Chiamate**: link `tel:`, apre il dialer del dispositivo. Non è una chiamata VOIP nel browser.
 - **Sicurezza**: nessun vero login. Chiunque abbia l'URL dell'app (e sappia leggere il codice sorgente) può leggere/scrivere su Eventi e Messaggi. Adeguato per un gruppo interno fidato, non per un pubblico ampio.
+- **Cancellazione messaggi**: il bottone "✕" per eliminare un messaggio compare solo su quelli con lo stesso nome scelto in "Sei: ..." — ma è un controllo lato interfaccia, non autenticazione reale: senza login vero, chiunque conosca l'indirizzo dell'API Firestore potrebbe in teoria cancellare messaggi altrui. Stesso principio già usato per gli eventi.

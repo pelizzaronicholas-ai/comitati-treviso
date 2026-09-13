@@ -199,6 +199,13 @@ form.stack input[type="file"] {
 .msg.mine { background: linear-gradient(135deg, var(--blu-2), var(--blu-3)); color: #fff; align-self: flex-end; border-radius: 14px 14px 4px 14px; }
 .msg .author { font-size: 10.5px; color: var(--text-secondary); margin-bottom: 3px; font-weight: 700; }
 .msg.mine .author { color: #cddaee; }
+.msg { position: relative; }
+.msg-del {
+  position: absolute; top: 4px; right: 6px; border: none; background: transparent;
+  color: rgba(255,255,255,.75); font-size: 12px; cursor: pointer; padding: 2px 4px; border-radius: 4px;
+  line-height: 1;
+}
+.msg-del:hover { background: rgba(0,0,0,.15); color: #fff; }
 .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--grigio-bordo); }
 .chat-input input { flex: 1 1 auto; padding: 9px 12px; border: 1px solid var(--grigio-bordo); border-radius: 999px; font-size: 13px; }
 .chat-input input:focus { outline: none; border-color: var(--blu-3); box-shadow: 0 0 0 3px rgba(42,99,179,.15); }

@@ -10,12 +10,24 @@
     return true;
   }
 
-  function renderMsg(data) {
+  function renderMsg(id, data) {
     const div = document.createElement("div");
     const mine = data.author === window.FN_APP.whoami();
     div.className = "msg" + (mine ? " mine" : "");
     const time = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
-    div.innerHTML = `<div class="author">${data.author || "anonimo"} · ${time}</div>${(data.text || "").replace(/</g, "&lt;")}`;
+    div.innerHTML = `
+      <div class="author">${data.author || "anonimo"} · ${time}</div>
+      ${(data.text || "").replace(/</g, "&lt;")}
+      ${mine ? '<button class="msg-del" title="Elimina messaggio">✕</button>' : ""}
+    `;
+    // Puoi cancellare solo i messaggi con il tuo stesso nome ("Sei: ..."):
+    // non e' autenticazione vera (nessun login), e' un controllo lato interfaccia,
+    // coerente con il resto dell'app che non ha un sistema di permessi reale.
+    if (mine) {
+      div.querySelector(".msg-del").addEventListener("click", () => {
+        if (confirm("Eliminare questo messaggio?")) window.db.collection(COLLECTION).doc(id).delete();
+      });
+    }
     return div;
   }
 
@@ -23,7 +35,7 @@
     const box = document.getElementById("chat-msgs");
     window.db.collection(COLLECTION).orderBy("createdAt", "asc").limitToLast(200).onSnapshot(snap => {
       box.innerHTML = "";
-      snap.forEach(doc => box.appendChild(renderMsg(doc.data())));
+      snap.forEach(doc => box.appendChild(renderMsg(doc.id, doc.data())));
       box.scrollTop = box.scrollHeight;
     }, err => {
       box.innerHTML = `<div class="notice error">Errore lettura messaggi: ${err.message}</div>`;
