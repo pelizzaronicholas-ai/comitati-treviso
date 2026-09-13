@@ -30,7 +30,6 @@
 <nav class="tabs">
   <button class="tab-btn active" data-tab="mappa">Mappa &amp; Rubrica</button>
   <button class="tab-btn" data-tab="eventi">Eventi</button>
-  <button class="tab-btn" data-tab="messaggi">Messaggi</button>
 </nav>
 
 <!-- ===================== TAB: MAPPA & RUBRICA ===================== -->
@@ -93,24 +92,6 @@
   </div>
 </section>
 
-<!-- ===================== TAB: MESSAGGI ===================== -->
-<section class="tab-panel" id="tab-messaggi">
-  <div id="chat-fb-notice"></div>
-  <div class="card" style="max-width:640px;">
-    <h3 style="margin-top:0;">Bacheca interna</h3>
-    <p style="font-size:12px;color:var(--text-secondary);margin-top:-6px;">
-      Visibile a tutti i referenti collegati all'app. Non sostituisce WhatsApp/telefono per le urgenze.
-    </p>
-    <div class="chat-box">
-      <div class="chat-msgs" id="chat-msgs"></div>
-      <div class="chat-input">
-        <input type="text" id="chat-text" placeholder="Scrivi un messaggio…">
-        <button class="btn primary" id="chat-send">Invia</button>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- Leaflet (mappa con basemap OpenStreetMap reale) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -123,7 +104,6 @@
 <script src="map.js"></script>
 <script src="rubrica.js"></script>
 <script src="eventi.js"></script>
-<script src="messaggi.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

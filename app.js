@@ -78,7 +78,6 @@
     safe("mappa", () => window.FN_MAP.render());
     safe("rubrica", () => window.FN_RUBRICA.render(""));
     safe("eventi", () => window.FN_EVENTI.init());
-    safe("messaggi", () => window.FN_MESSAGGI.init());
   });
 
   window.FN_APP = {

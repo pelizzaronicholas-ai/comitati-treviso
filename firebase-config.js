@@ -24,8 +24,8 @@ const firebaseConfig = {
 
 // Inizializzazione (SDK compat, caricato via CDN in index.html).
 // Se non hai ancora compilato la config sopra, l'app funziona comunque per
-// mappa/rubrica (dati statici in data.js): solo Eventi e Messaggi restano
-// disabilitati finche' non colleghi Firebase.
+// mappa/rubrica (dati statici in data.js): solo Eventi resta
+// disabilitato finche' non colleghi Firebase.
 window.FN_FIREBASE_READY = false;
 try {
   if (firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("INCOLLA")) {
@@ -33,7 +33,7 @@ try {
     window.db = firebase.firestore();
     window.FN_FIREBASE_READY = true;
   } else {
-    console.warn("[FN] Firebase non configurato: compila firebase-config.js per abilitare Eventi e Messaggi.");
+    console.warn("[FN] Firebase non configurato: compila firebase-config.js per abilitare Eventi.");
   }
 } catch (e) {
   console.error("[FN] Errore inizializzazione Firebase:", e);

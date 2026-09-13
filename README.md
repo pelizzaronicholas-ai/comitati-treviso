@@ -1,25 +1,24 @@
 # Comitati di TREVISO
 
-App interna per la rete dei comitati Futuro Nazionale della provincia di Treviso: mappa + rubrica, eventi, bacheca messaggi.
+App interna per la rete dei comitati Futuro Nazionale della provincia di Treviso: mappa + rubrica, eventi.
 
 ## Struttura
 
 ```
-index.html        shell dell'app, tab Mappa/Eventi/Messaggi
+index.html        shell dell'app, tab Mappa/Eventi
 style.css         tema grigio/blu/giallo
 data.js           i 27 contatti (referente/comune/email/telefono/coordinate) — dati statici
 firebase-config.js  configurazione Firebase — DA COMPILARE (vedi sotto)
-map.js            mappa SVG (proiezione lat/lon corretta per coseno latitudine)
+map.js            mappa Leaflet con basemap OpenStreetMap
 rubrica.js        elenco contatti, ricerca, selezione multipla, azioni bulk (email/WhatsApp)
-eventi.js         creazione/lettura eventi su Firestore, notifica via mailto
-messaggi.js       bacheca realtime su Firestore
+eventi.js         creazione/lettura eventi su Firestore, notifica via mailto, locandine
 app.js            bootstrap, tabs, scheda dettaglio, "chi sei"
 assets/logo-placeholder.svg  logo temporaneo, sostituiscilo con quello ufficiale
 ```
 
-## 1. Collegare Firebase (necessario per Eventi e Messaggi)
+## 1. Collegare Firebase (necessario per Eventi)
 
-Mappa e Rubrica funzionano subito, dati statici in `data.js`. Eventi e Messaggi richiedono un progetto Firebase (piano gratuito Spark, sufficiente per questo uso):
+Mappa e Rubrica funzionano subito, dati statici in `data.js`. Eventi richiede un progetto Firebase (piano gratuito Spark, sufficiente per questo uso):
 
 1. Vai su https://console.firebase.google.com/ → crea un progetto.
 2. Nel progetto: icona **Web (`</>`)** → registra l'app (basta un nome, es. `comitati-tv`). **Non serve** attivare Firebase Hosting: ospitiamo su GitHub Pages.
@@ -29,7 +28,7 @@ Mappa e Rubrica funzionano subito, dati statici in `data.js`. Eventi e Messaggi 
 
 ### Regole Firestore (baseline)
 
-Il tool non ha login: chiunque abbia il link dell'app può leggere/scrivere eventi e messaggi. Va bene per un gruppo ristretto e un URL non pubblicizzato, ma **non è un sistema con permessi reali**. Regole minime per evitare abusi grossolani (limite dimensione testo, campi obbligatori):
+Il tool non ha login: chiunque abbia il link dell'app può leggere/scrivere eventi. Va bene per un gruppo ristretto e un URL non pubblicizzato, ma **non è un sistema con permessi reali**. Regole minime per evitare abusi grossolani (limite dimensione testo, campi obbligatori):
 
 ```
 rules_version = '2';
@@ -42,17 +41,11 @@ service cloud.firestore {
       allow delete: if true;
       allow update: if false;
     }
-    match /messaggi_treviso/{doc} {
-      allow read: if true;
-      allow create: if request.resource.data.text is string
-                     && request.resource.data.text.size() > 0
-                     && request.resource.data.text.size() < 1000;
-      allow delete: if true;
-      allow update: if false;
-    }
   }
 }
 ```
+
+Se avevi già pubblicato la regola `messaggi_treviso` (bacheca, ora rimossa dall'app), puoi lasciarla così com'è in Firestore — non fa danni, semplicemente nessuna parte dell'app ci scrive più — oppure toglierla dall'editor delle Regole per pulizia.
 
 Se in futuro vuoi permessi veri (solo i referenti possono scrivere, un admin può eliminare tutto), il prossimo passo è attivare **Firebase Authentication** (es. accesso con email/password o Google) e condizionare le regole su `request.auth != null`. Non l'ho aggiunto ora per restare semplice: dimmelo se vuoi che lo integri.
 
@@ -89,7 +82,6 @@ Nel form "Nuovo evento" puoi allegare un'immagine (JPG/PNG). Viene compressa nel
 
 - **Email bulk**: il bottone "Email ai selezionati" apre il client di posta con i destinatari in BCC — l'invio lo confermi tu, non è automatico, e **il mittente è quello di default sul dispositivo/client di chi clicca**, non un indirizzo fisso: `mailto:` non permette di specificare un mittente (limite del protocollo, non dell'app). Per garantire che le email partano sempre da un indirizzo fisso (es. comitatoroncade@gmail.com) serve invio automatico lato server con un servizio come EmailJS o la Gmail API — vedi discussione con Nicholas.
 - **WhatsApp bulk**: non esiste un link che apra una chat verso più numeri insieme. Selezionandone più di uno, l'app apre una finestra WhatsApp per contatto, in sequenza — le devi confermare/inviare tu una per una.
-- **Messenger**: non integrato — servirebbe lo username Facebook di ogni referente, che non abbiamo.
+- **Messenger/messaggistica interna**: non presente — rimossa perché senza un vero sistema di login non si poteva garantire che solo l'autore di un messaggio potesse cancellarlo. Per parlare con i referenti restano email, telefono e WhatsApp dalla scheda contatto.
 - **Chiamate**: link `tel:`, apre il dialer del dispositivo. Non è una chiamata VOIP nel browser.
-- **Sicurezza**: nessun vero login. Chiunque abbia l'URL dell'app (e sappia leggere il codice sorgente) può leggere/scrivere su Eventi e Messaggi. Adeguato per un gruppo interno fidato, non per un pubblico ampio.
-- **Cancellazione messaggi**: il bottone "✕" per eliminare un messaggio compare solo su quelli con lo stesso nome scelto in "Sei: ..." — ma è un controllo lato interfaccia, non autenticazione reale: senza login vero, chiunque conosca l'indirizzo dell'API Firestore potrebbe in teoria cancellare messaggi altrui. Stesso principio già usato per gli eventi.
+- **Sicurezza**: nessun vero login. Chiunque abbia l'URL dell'app (e sappia leggere il codice sorgente) può leggere/scrivere su Eventi. Adeguato per un gruppo interno fidato, non per un pubblico ampio.
