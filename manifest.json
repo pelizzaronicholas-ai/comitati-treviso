@@ -1,0 +1,14 @@
+{
+  "name": "Comitati di TREVISO",
+  "short_name": "Comitati TV",
+  "description": "Rete dei comitati territoriali Futuro Nazionale - Provincia di Treviso",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12305c",
+  "theme_color": "#12305c",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
