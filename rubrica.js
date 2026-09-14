@@ -92,8 +92,14 @@
     document.getElementById("bulk-email").addEventListener("click", () => {
       const list = getSelectedContacts();
       if (list.length === 0) { alert("Seleziona almeno un comitato."); return; }
-      const bcc = list.map(d => d.email).join(",");
-      window.location.href = `mailto:?bcc=${encodeURIComponent(bcc)}`;
+      // Passa dalla finestra di composizione condivisa: se EmailJS è configurato
+      // (vedi emailjs-config.js) parte sempre da comitatoroncade@gmail.com,
+      // un destinatario alla volta.
+      window.FN_EMAIL.open({
+        title: `Email a ${list.length} comitati selezionati`,
+        recipients: list,
+        recipientsLabel: `A: ${list.length} comitati selezionati`
+      });
     });
 
     document.getElementById("bulk-wa").addEventListener("click", () => {

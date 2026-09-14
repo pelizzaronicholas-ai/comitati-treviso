@@ -70,6 +70,14 @@
         <input type="datetime-local" id="ev-date" required>
         <label>Luogo</label>
         <input type="text" id="ev-place" placeholder="Es. Piazza dei Signori, Treviso">
+        <label>Punto esatto sulla mappa (facoltativo, serve per le indicazioni stradali)</label>
+        <div class="geo-search">
+          <input type="text" id="ev-geo-search" placeholder="Cerca un indirizzo…">
+          <button type="button" class="btn small" id="ev-geo-search-btn">Cerca</button>
+        </div>
+        <div id="ev-map-picker"></div>
+        <div class="geo-status" id="ev-geo-status">Nessun punto impostato — clicca sulla mappa o cerca un indirizzo.</div>
+        <button type="button" class="btn small" id="ev-geo-clear" style="display:none;align-self:flex-start;">Rimuovi punto</button>
         <label>Descrizione</label>
         <textarea id="ev-desc" rows="3" placeholder="Dettagli per i referenti…"></textarea>
         <label>Destinatari</label>
@@ -92,6 +100,23 @@
   </div>
 </section>
 
+<!-- ===================== FINESTRA COMPOSIZIONE EMAIL (condivisa) ===================== -->
+<div class="fn-modal-overlay" id="email-modal" style="display:none;">
+  <div class="fn-modal card">
+    <h3 id="email-modal-title">Invia email</h3>
+    <div class="email-modal-recipients" id="email-modal-recipients"></div>
+    <label>Oggetto</label>
+    <input type="text" id="email-modal-subject" placeholder="Oggetto dell'email">
+    <label>Messaggio</label>
+    <textarea id="email-modal-body" rows="7" placeholder="Scrivi qui il testo…"></textarea>
+    <div class="email-modal-status" id="email-modal-status"></div>
+    <div class="actions">
+      <button class="btn primary" id="email-modal-send">✉️ Invia</button>
+      <button class="btn" id="email-modal-cancel">Annulla</button>
+    </div>
+  </div>
+</div>
+
 <!-- Leaflet (mappa con basemap OpenStreetMap reale) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -99,8 +124,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 
+<!-- EmailJS: invio email con mittente fisso comitatoroncade@gmail.com (vedi emailjs-config.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
 <script src="data.js"></script>
 <script src="firebase-config.js"></script>
+<script src="emailjs-config.js"></script>
+<script src="email-sender.js"></script>
 <script src="map.js"></script>
 <script src="rubrica.js"></script>
 <script src="eventi.js"></script>

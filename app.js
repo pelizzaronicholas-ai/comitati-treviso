@@ -23,15 +23,25 @@
       </div>
       <div class="detail-rows">
         <div class="detail-row"><span class="drow-label">Comitato</span><span class="drow-value">${d.name}</span></div>
-        <div class="detail-row"><span class="drow-label">Email</span><a class="drow-value" href="mailto:${d.email}">${d.email}</a></div>
+        <div class="detail-row"><span class="drow-label">Email</span><span class="drow-value">${d.email}</span></div>
         <div class="detail-row"><span class="drow-label">Telefono</span><a class="drow-value" href="tel:${d.tel}">${d.tel}</a></div>
       </div>
       <div class="actions">
-        <a class="btn primary" href="mailto:${d.email}">✉️ Scrivi email</a>
+        <button class="btn primary" data-action="write-email">✉️ Scrivi email</button>
         <a class="btn" href="tel:${d.tel}">📞 Chiama</a>
         <a class="btn accent" href="${window.FN_UTILS.waLink(d.tel)}" target="_blank">WhatsApp</a>
       </div>
     `;
+    // L'email non è più un mailto diretto: passa dalla finestra di composizione
+    // condivisa, cosi' anche il messaggio a un singolo comitato parte sempre
+    // da comitatoroncade@gmail.com (se EmailJS è configurato, vedi emailjs-config.js).
+    el.querySelector('[data-action="write-email"]').addEventListener("click", () => {
+      window.FN_EMAIL.open({
+        title: `Email a ${d.ref || d.name}`,
+        recipients: [d],
+        recipientsLabel: `A: ${d.ref || d.name} <${d.email}>`
+      });
+    });
   }
 
   function select(id) {
@@ -48,6 +58,12 @@
         document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+        // La mini-mappa per il punto evento vive in un tab nascosto all'avvio:
+        // Leaflet calcolerebbe dimensioni 0x0 se inizializzata li'. La creiamo
+        // (o ne ricalcoliamo le dimensioni) solo quando il tab diventa visibile.
+        if (btn.dataset.tab === "eventi" && window.FN_EVENTI && window.FN_EVENTI.onShow) {
+          window.FN_EVENTI.onShow();
+        }
       });
     });
   }

@@ -1,5 +1,6 @@
 // Modulo Eventi: creazione, targeting (tutti / un comune / selezione manuale
-// dalla Rubrica), notifica via mailto generato sui destinatari del target.
+// dalla Rubrica), notifica via email (finestra di composizione condivisa,
+// vedi email-sender.js) ai destinatari del target.
 // Persistenza su Firestore -> visibile in tempo reale a chiunque apra l'app.
 (function () {
   const COLLECTION = "eventi_treviso";
@@ -52,6 +53,139 @@
     document.body.appendChild(ov);
   }
 
+  // ---------------------------------------------------------------------
+  // Punto evento sulla mappa: mini-mappa Leaflet cliccabile + ricerca
+  // indirizzo via Nominatim (OpenStreetMap, gratuito, nessuna chiave API).
+  // Uso leggero (poche ricerche saltuarie) coerente con la loro policy d'uso;
+  // se in futuro l'app crescesse molto andrebbe sostituito con un servizio
+  // di geocoding dedicato.
+  // ---------------------------------------------------------------------
+  let pickerMap = null;
+  let pickerMarker = null;
+  let evLat = null, evLon = null;
+
+  function updateGeoStatus() {
+    const el = document.getElementById("ev-geo-status");
+    const clearBtn = document.getElementById("ev-geo-clear");
+    if (evLat != null && evLon != null) {
+      el.textContent = `📍 Punto impostato: ${evLat.toFixed(5)}, ${evLon.toFixed(5)}`;
+      el.classList.add("set");
+      clearBtn.style.display = "inline-flex";
+    } else {
+      el.textContent = "Nessun punto impostato — clicca sulla mappa o cerca un indirizzo.";
+      el.classList.remove("set");
+      clearBtn.style.display = "none";
+    }
+  }
+
+  function setPickerPoint(lat, lon, recenter) {
+    evLat = lat; evLon = lon;
+    if (!pickerMarker) {
+      pickerMarker = L.marker([lat, lon], { draggable: true }).addTo(pickerMap);
+      pickerMarker.on("dragend", () => {
+        const p = pickerMarker.getLatLng();
+        evLat = p.lat; evLon = p.lng;
+        updateGeoStatus();
+      });
+    } else {
+      pickerMarker.setLatLng([lat, lon]);
+    }
+    if (recenter) pickerMap.setView([lat, lon], Math.max(pickerMap.getZoom(), 13));
+    updateGeoStatus();
+  }
+
+  function clearPickerPoint() {
+    evLat = null; evLon = null;
+    if (pickerMarker) { pickerMap.removeLayer(pickerMarker); pickerMarker = null; }
+    updateGeoStatus();
+  }
+
+  function initPickerMap() {
+    if (pickerMap) { pickerMap.invalidateSize(); return; }
+    pickerMap = L.map("ev-map-picker", { scrollWheelZoom: false }).setView([45.75, 12.25], 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(pickerMap);
+    pickerMap.on("click", (e) => setPickerPoint(e.latlng.lat, e.latlng.lng, false));
+    setTimeout(() => pickerMap.invalidateSize(), 200);
+
+    document.getElementById("ev-geo-clear").addEventListener("click", clearPickerPoint);
+
+    async function geocode() {
+      const q = document.getElementById("ev-geo-search").value.trim();
+      if (!q) return;
+      const statusEl = document.getElementById("ev-geo-status");
+      statusEl.textContent = "Ricerca in corso…";
+      try {
+        const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=" + encodeURIComponent(q);
+        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        const results = await res.json();
+        if (!results.length) {
+          alert("Nessun risultato per questo indirizzo. Prova a essere più specifico (es. con la città) o clicca direttamente sulla mappa.");
+          updateGeoStatus();
+          return;
+        }
+        setPickerPoint(parseFloat(results[0].lat), parseFloat(results[0].lon), true);
+      } catch (err) {
+        alert("Ricerca indirizzo non riuscita (problema di rete). Puoi comunque cliccare direttamente sulla mappa per indicare il punto.");
+        updateGeoStatus();
+      }
+    }
+    document.getElementById("ev-geo-search-btn").addEventListener("click", geocode);
+    document.getElementById("ev-geo-search").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); geocode(); }
+    });
+  }
+
+  function resetPicker() {
+    document.getElementById("ev-geo-search").value = "";
+    clearPickerPoint();
+  }
+
+  // ---------------------------------------------------------------------
+  // Aggiungi al calendario del telefono: generiamo un file .ics al volo
+  // nel browser (nessun server coinvolto). Su iPhone/Safari in genere apre
+  // subito la schermata "Aggiungi a calendario"; su Android/desktop scarica
+  // il file .ics, che poi si apre con un tap per importarlo.
+  // ---------------------------------------------------------------------
+  function icsEscape(s) {
+    return String(s || "").replace(/[\\,;]/g, m => "\\" + m).replace(/\n/g, "\\n");
+  }
+  function toICSDate(d) {
+    const p = n => String(n).padStart(2, "0");
+    return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + "T" + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + "Z";
+  }
+  function buildICS(ev, id) {
+    const start = new Date(ev.date);
+    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // durata fissa 2h, non abbiamo un orario di fine
+    const lines = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Comitati di TREVISO//IT", "BEGIN:VEVENT",
+      "UID:fn-evento-" + id + "@comitati-treviso",
+      "DTSTAMP:" + toICSDate(new Date()),
+      "DTSTART:" + toICSDate(start),
+      "DTEND:" + toICSDate(end),
+      "SUMMARY:" + icsEscape(ev.title)
+    ];
+    if (ev.place) lines.push("LOCATION:" + icsEscape(ev.place));
+    if (ev.description) lines.push("DESCRIPTION:" + icsEscape(ev.description));
+    if (ev.lat != null && ev.lon != null) lines.push(`GEO:${ev.lat};${ev.lon}`);
+    lines.push("END:VEVENT", "END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+  function addToCalendar(ev, id) {
+    const ics = buildICS(ev, id);
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "evento-" + (ev.title || "evento").toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
   function targetContacts(target) {
     const DATA = window.CONTACTS;
     if (target.type === "all") return DATA;
@@ -73,22 +207,38 @@
       <div><span class="target">${targetLabel}</span></div>
       ${ev.poster ? `<img class="event-poster" src="${ev.poster}" alt="Locandina evento" title="Clicca per ingrandire">` : ""}
       <p style="font-size:13px;">${(ev.description || "").replace(/</g, "&lt;")}</p>
+      ${ev.lat != null && ev.lon != null ? `
+      <div class="event-directions">
+        <a class="btn small" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lon}">📍 Google Maps</a>
+        <a class="btn small" target="_blank" href="https://maps.apple.com/?daddr=${ev.lat},${ev.lon}">📍 Apple Maps</a>
+        <a class="btn small" target="_blank" href="https://waze.com/ul?ll=${ev.lat},${ev.lon}&navigate=yes">📍 Waze</a>
+      </div>` : ""}
       <div class="detail actions">
         <button class="btn primary" data-action="notify">✉️ Invia notifica ai destinatari</button>
+        <button class="btn" data-action="calendar">📅 Aggiungi al calendario</button>
         <button class="btn" data-action="delete">Elimina</button>
       </div>
     `;
     if (ev.poster) {
       div.querySelector(".event-poster").addEventListener("click", () => openLightbox(ev.poster));
     }
+    div.querySelector('[data-action="calendar"]').addEventListener("click", () => addToCalendar(ev, id));
     div.querySelector('[data-action="notify"]').addEventListener("click", () => {
       const recipients = targetContacts(ev.target);
       if (recipients.length === 0) { alert("Nessun destinatario per questo evento."); return; }
-      const bcc = recipients.map(d => d.email).join(",");
       const subject = `Evento: ${ev.title}`;
       const body = `${ev.title}\n${dt}${ev.place ? "\nLuogo: " + ev.place : ""}\n\n${ev.description || ""}`
         + (ev.poster ? "\n\n(Locandina disponibile nella scheda evento, tab Eventi dell'app.)" : "");
-      window.location.href = `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // Oggetto/testo sono già pronti (generati dai dati evento) ma restano
+      // modificabili prima dell'invio. Se EmailJS è configurato (vedi
+      // emailjs-config.js) parte sempre da comitatoroncade@gmail.com.
+      window.FN_EMAIL.open({
+        title: `Notifica evento: ${ev.title}`,
+        recipients,
+        recipientsLabel: `A: ${recipients.length} comitati (${targetLabel})`,
+        subject,
+        body
+      });
     });
     div.querySelector('[data-action="delete"]').addEventListener("click", () => {
       if (confirm("Eliminare questo evento?")) window.db.collection(COLLECTION).doc(id).delete();
@@ -151,6 +301,7 @@
         title: document.getElementById("ev-title").value,
         date: document.getElementById("ev-date").value,
         place: document.getElementById("ev-place").value,
+        lat: evLat, lon: evLon,
         description: document.getElementById("ev-desc").value,
         poster: posterData || null,
         target,
@@ -161,6 +312,7 @@
         e.target.reset();
         posterData = null;
         posterPreview.style.display = "none";
+        resetPicker();
       });
     });
   }
@@ -174,6 +326,11 @@
         return;
       }
       listenEvents();
+    },
+    // Chiamato da app.js quando il tab "Eventi" diventa visibile: la mini-mappa
+    // non puo' inizializzarsi correttamente mentre e' nascosta (dimensioni 0x0).
+    onShow() {
+      try { initPickerMap(); } catch (e) { console.error("[FN] Errore mappa punto evento:", e); }
     }
   };
 })();

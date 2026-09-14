@@ -192,9 +192,37 @@ form.stack input[type="file"] {
 }
 .fn-lightbox img { max-width: 100%; max-height: 100%; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 
+/* ---------- Geolocalizzazione evento ---------- */
+.geo-search { display: flex; gap: 6px; }
+.geo-search input { flex: 1 1 auto; }
+#ev-map-picker { height: 220px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--grigio-bordo); cursor: crosshair; }
+.geo-status { font-size: 11.5px; color: var(--text-secondary); margin-top: -4px; }
+.geo-status.set { color: var(--blu-3); font-weight: 600; }
+.event-directions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.event-directions .btn { font-size: 11.5px; padding: 5px 10px; }
+
 
 .notice { font-size: 12.5px; color: var(--text-secondary); background: #fff8e1; border: 1px solid #f1dfa0; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px; }
 .notice.error { background: #fdecea; border-color: #f3c2bd; }
+
+/* ---------- Finestra composizione email (condivisa) ---------- */
+.fn-modal-overlay {
+  position: fixed; inset: 0; background: rgba(10, 14, 20, .55); display: flex;
+  align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+}
+.fn-modal { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+.fn-modal h3 { margin: 0; font-size: 16px; }
+.fn-modal label { font-size: 12px; color: var(--text-secondary); font-weight: 700; margin-bottom: -5px; }
+.fn-modal input[type="text"], .fn-modal textarea {
+  padding: 9px 12px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm);
+  font-size: 13px; font-family: inherit; width: 100%;
+}
+.fn-modal input[type="text"]:focus, .fn-modal textarea:focus {
+  outline: none; border-color: var(--blu-3); box-shadow: 0 0 0 3px rgba(42,99,179,.15);
+}
+.email-modal-recipients { font-size: 12px; color: var(--blu); background: var(--grigio-chiaro); border-radius: var(--radius-sm); padding: 7px 11px; font-weight: 600; }
+.email-modal-status { font-size: 12px; color: var(--blu-3); font-weight: 600; min-height: 16px; }
+.fn-modal .actions { display: flex; gap: 8px; margin-top: 2px; }
 
 @media (max-width: 720px) {
   .app-header { flex-wrap: wrap; padding: 12px 16px; gap: 10px; }
