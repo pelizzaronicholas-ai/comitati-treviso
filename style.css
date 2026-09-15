@@ -201,7 +201,6 @@ form.stack input[type="file"] {
 .event-directions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .event-directions .btn { font-size: 11.5px; padding: 5px 10px; }
 
-
 .notice { font-size: 12.5px; color: var(--text-secondary); background: #fff8e1; border: 1px solid #f1dfa0; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px; }
 .notice.error { background: #fdecea; border-color: #f3c2bd; }
 
@@ -224,6 +223,112 @@ form.stack input[type="file"] {
 .email-modal-status { font-size: 12px; color: var(--blu-3); font-weight: 600; min-height: 16px; }
 .fn-modal .actions { display: flex; gap: 8px; margin-top: 2px; }
 
+/* ---------- Righe a due colonne nei form (evento, comitato) ---------- */
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.form-row > div { flex: 1 1 160px; display: flex; flex-direction: column; gap: 4px; }
+.form-section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 800;
+  color: var(--blu); margin: 10px 0 -2px; padding-top: 10px; border-top: 1px solid var(--grigio-bordo);
+}
+.form-section-title:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
+.list-toolbar select { padding: 8px 10px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); font-size: 12.5px; font-family: inherit; background: #fff; }
+
+/* ---------- Dashboard ---------- */
+.dash-container { display: flex; flex-direction: column; gap: 16px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.dash-card { background: var(--surface-2); border: 1px solid var(--grigio-bordo); border-radius: var(--radius); padding: 16px; text-align: center; box-shadow: var(--shadow-sm); }
+.dash-num { font-size: 28px; font-weight: 800; font-family: "Poppins", sans-serif; color: var(--blu); }
+.dash-label { font-size: 11.5px; color: var(--text-secondary); margin-top: 4px; font-weight: 600; }
+.dash-columns { display: flex; gap: 16px; flex-wrap: wrap; }
+.dash-col { flex: 1 1 260px; }
+.dash-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; }
+.dash-list li { border-bottom: 1px solid var(--grigio-bordo); padding-bottom: 8px; }
+.dash-list li:last-child { border-bottom: none; padding-bottom: 0; }
+
+/* ---------- Stati (eventi e comitati) ---------- */
+.stato-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+.stato-bozza { background: #eef1f4; color: #676b72; }
+.stato-in_programmazione { background: #e3edff; color: #1d4c8f; }
+.stato-confermato { background: #e1f6ea; color: #1c7a45; }
+.stato-in_corso { background: #fff2cf; color: #8a6600; }
+.stato-concluso { background: #e6e6e6; color: #3a3a3a; }
+.stato-annullato { background: #fdecea; color: #a33025; }
+
+.badge-stato { display: inline-block; margin-top: 3px; margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.badge-stato.inattivo { background: #fdecea; color: #a33025; }
+.badge-stato.in_costituzione { background: #fff2cf; color: #8a6600; }
+.stato-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
+.stato-dot.inattivo { background: var(--danger); }
+.stato-dot.in_costituzione { background: var(--giallo-scuro); }
+
+.detail-eventi { margin-top: 14px; }
+.detail-eventi-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+
+/* ---------- Scheda evento: intestazione, stato, pannelli espandibili ---------- */
+.event-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.event-stato-change { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; }
+.event-stato-change label { font-weight: 700; color: var(--text-secondary); }
+.event-stato-change select { padding: 5px 9px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; }
+
+.event-panel { margin-top: 10px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); overflow: hidden; }
+.event-panel summary { cursor: pointer; padding: 9px 12px; font-size: 12.5px; font-weight: 700; color: var(--blu); background: var(--grigio-chiaro); list-style: none; }
+.event-panel summary::-webkit-details-marker { display: none; }
+.event-panel[open] summary { border-bottom: 1px solid var(--grigio-bordo); }
+.panel-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.panel-subtitle { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); margin: 6px 0 2px; font-weight: 700; }
+
+.checklist-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.checklist-item span.done { text-decoration: line-through; color: var(--text-secondary); }
+.checklist-add { display: flex; gap: 6px; margin-top: 4px; }
+.checklist-new-label { flex: 1 1 auto; padding: 7px 10px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); font-size: 12.5px; font-family: inherit; }
+
+.budget-grid, .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.budget-grid label, .report-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--text-secondary); font-weight: 700; }
+.budget-grid input, .budget-grid textarea, .report-grid input, .report-grid textarea { padding: 7px 10px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+
+.vicini-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.vicini-filter.active { background: var(--blu); border-color: var(--blu); color: #fff; }
+.vicini-list { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; margin-bottom: 4px; }
+.vicino-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.part-list { display: flex; flex-direction: column; gap: 8px; }
+.part-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; border-bottom: 1px solid var(--grigio-bordo); padding-bottom: 8px; }
+.part-row:last-child { border-bottom: none; padding-bottom: 0; }
+.part-name { flex: 1 1 140px; font-weight: 600; }
+.part-row select { padding: 5px 8px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); font-size: 11.5px; font-family: inherit; }
+.part-remove { padding: 4px 8px; }
+
+/* ---------- Calendario ---------- */
+.cal-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.cal-filters select, .cal-filters input { padding: 7px 10px; border: 1px solid var(--grigio-bordo); border-radius: var(--radius-sm); font-size: 12.5px; font-family: inherit; }
+.cal-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.cal-view-toggle { display: flex; gap: 6px; }
+.cal-view-toggle .btn.active { background: var(--blu); border-color: var(--blu); color: #fff; }
+.cal-nav { display: flex; align-items: center; gap: 6px; }
+.cal-month-label { font-weight: 700; color: var(--blu); text-transform: capitalize; margin-left: 4px; font-size: 13px; }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--grigio-chiaro); font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); text-align: center; padding: 8px 0; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-cell { min-height: 64px; border: 1px solid #f0f1f3; padding: 6px; cursor: pointer; transition: background .12s ease; }
+.cal-cell:hover { background: #f4f8fd; }
+.cal-cell.empty { cursor: default; background: #fafafa; }
+.cal-cell.today .cal-daynum { background: var(--giallo); border-radius: 50%; padding: 1px 6px; }
+.cal-cell.selected { background: #e8f0fc; }
+.cal-daynum { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+.cal-dots { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
+.cal-dot { width: 7px; height: 7px; border-radius: 50%; }
+.cal-dot.stato-bozza { background: #9aa0a6; }
+.cal-dot.stato-in_programmazione { background: #1d4c8f; }
+.cal-dot.stato-confermato { background: #1c7a45; }
+.cal-dot.stato-in_corso { background: #cf9d00; }
+.cal-dot.stato-concluso { background: #6b6b6b; }
+.cal-dot.stato-annullato { background: #c0392b; }
+.cal-more { font-size: 9.5px; color: var(--text-secondary); }
+.cal-event-summary { border-bottom: 1px solid var(--grigio-bordo); padding: 8px 0; }
+.cal-event-summary:last-child { border-bottom: none; }
+.cal-event-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.agenda-day { margin-bottom: 14px; }
+.agenda-day-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 800; color: var(--blu); margin-bottom: 6px; }
+
 @media (max-width: 720px) {
   .app-header { flex-wrap: wrap; padding: 12px 16px; gap: 10px; }
   .app-header img.logo { height: 44px; width: 44px; }
@@ -243,9 +348,20 @@ form.stack input[type="file"] {
   .bulkbar .btn { flex: 1 1 auto; justify-content: center; }
   form.stack { max-width: 100%; }
   .event-poster, #ev-poster-preview { max-width: 100%; }
+  .form-row { flex-direction: column; }
+  .dash-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .dash-columns { flex-direction: column; }
+  .budget-grid, .report-grid { grid-template-columns: 1fr; }
+  .cal-cell { min-height: 46px; padding: 4px; }
+  .cal-filters { flex-direction: column; }
+  .cal-filters select, .cal-filters input { width: 100%; }
+  .cal-toolbar { flex-direction: column; align-items: stretch; }
+  .cal-nav { justify-content: center; }
 }
 
 @media (max-width: 420px) {
   .app-header .titles p { display: none; }
   .row .row-avatar { width: 26px; height: 26px; font-size: 10.5px; }
+  .cal-weekdays span:nth-child(n) { font-size: 9px; }
+  .dash-num { font-size: 22px; }
 }

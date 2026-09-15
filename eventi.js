@@ -1,9 +1,35 @@
 // Modulo Eventi: creazione, targeting (tutti / un comune / selezione manuale
 // dalla Rubrica), notifica via email (finestra di composizione condivisa,
-// vedi email-sender.js) ai destinatari del target.
+// vedi email-sender.js) ai destinatari del target. Include: geolocalizzazione
+// evento con indicazioni stradali e aggiunta al calendario telefono,
+// workflow di stato, checklist operativa, budget, comitati vicini con
+// gestione partecipazione, report post-evento.
 // Persistenza su Firestore -> visibile in tempo reale a chiunque apra l'app.
 (function () {
   const COLLECTION = "eventi_treviso";
+
+  // Cache dell'ultima lista eventi ricevuta da Firestore: la usano anche
+  // dashboard.js e calendario.js (window.FN_EVENTI.getAll()) senza dover
+  // aprire una seconda lettura.
+  let allEvents = [];
+
+  const STATI_EVENTO = ["BOZZA", "IN_PROGRAMMAZIONE", "CONFERMATO", "IN_CORSO", "CONCLUSO", "ANNULLATO"];
+  const STATO_LABEL = {
+    BOZZA: "Bozza", IN_PROGRAMMAZIONE: "In programmazione", CONFERMATO: "Confermato",
+    IN_CORSO: "In corso", CONCLUSO: "Concluso", ANNULLATO: "Annullato"
+  };
+  const TIPOLOGIE = ["Presidio", "Banchetto/Gazebo", "Convegno/Dibattito", "Formazione", "Raccolta firme", "Cena sociale", "Volantinaggio", "Altro"];
+  const ATTIVITA_OPTIONS = ["Supporto organizzativo", "Volantinaggio", "Presenza all'evento", "Accoglienza", "Gestione materiale", "Comunicazione", "Altro"];
+  const PARTECIPAZIONE_STATI = ["DA_INVITARE", "INVITATO", "CONFERMATO", "NON_DISPONIBILE"];
+  const PARTECIPAZIONE_LABEL = { DA_INVITARE: "Da invitare", INVITATO: "Invitato", CONFERMATO: "Confermato", NON_DISPONIBILE: "Non disponibile" };
+  const CHECKLIST_DEFAULT = () => ["Location confermata", "Data confermata", "Relatori confermati", "Materiale preparato",
+    "Comunicazione preparata", "Comitati coinvolti", "Inviti inviati", "Volontari/referenti assegnati",
+    "Evento svolto", "Report compilato"].map(label => ({ label, done: false }));
+
+  // Ricorda quali pannelli <details> sono aperti (per id-evento + nome
+  // pannello): senza questo, ogni scrittura su Firestore (spunta una
+  // checklist, ecc.) causa un re-render che richiuderebbe tutto.
+  const openPanels = new Set();
 
   function fbNotice(container) {
     if (window.FN_FIREBASE_READY) { container.innerHTML = ""; return false; }
@@ -11,10 +37,10 @@
     return true;
   }
 
-  // Le locandine non vanno su Firebase Storage (su Spark serve comunque
-  // agganciare una carta per il piano Blaze): le comprimiamo lato browser e
-  // le salviamo come stringa base64 dentro al documento evento, restando
-  // ben sotto il limite di 1MB per documento di Firestore.
+  // ---------------------------------------------------------------------
+  // Locandine: compressione lato browser, salvate come base64 nel documento
+  // (niente Firebase Storage, restiamo sul piano gratuito).
+  // ---------------------------------------------------------------------
   function readAsDataUrl(file, maxWidth, quality) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -56,9 +82,6 @@
   // ---------------------------------------------------------------------
   // Punto evento sulla mappa: mini-mappa Leaflet cliccabile + ricerca
   // indirizzo via Nominatim (OpenStreetMap, gratuito, nessuna chiave API).
-  // Uso leggero (poche ricerche saltuarie) coerente con la loro policy d'uso;
-  // se in futuro l'app crescesse molto andrebbe sostituito con un servizio
-  // di geocoding dedicato.
   // ---------------------------------------------------------------------
   let pickerMap = null;
   let pickerMarker = null;
@@ -144,10 +167,8 @@
   }
 
   // ---------------------------------------------------------------------
-  // Aggiungi al calendario del telefono: generiamo un file .ics al volo
-  // nel browser (nessun server coinvolto). Su iPhone/Safari in genere apre
-  // subito la schermata "Aggiungi a calendario"; su Android/desktop scarica
-  // il file .ics, che poi si apre con un tap per importarlo.
+  // Aggiungi al calendario del telefono: file .ics generato al volo nel
+  // browser. Se c'e' un'ora di fine usiamo quella, altrimenti +2h di default.
   // ---------------------------------------------------------------------
   function icsEscape(s) {
     return String(s || "").replace(/[\\,;]/g, m => "\\" + m).replace(/\n/g, "\\n");
@@ -158,7 +179,16 @@
   }
   function buildICS(ev, id) {
     const start = new Date(ev.date);
-    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // durata fissa 2h, non abbiamo un orario di fine
+    let end;
+    if (ev.oraFine) {
+      const [h, m] = ev.oraFine.split(":").map(Number);
+      end = new Date(start);
+      end.setHours(h, m, 0, 0);
+      if (end <= start) end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // ora di fine incoerente -> fallback
+    } else {
+      end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // durata di default, non abbiamo un'ora di fine
+    }
+    const luogoCompleto = [ev.place, ev.indirizzo, ev.comune].filter(Boolean).join(", ");
     const lines = [
       "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Comitati di TREVISO//IT", "BEGIN:VEVENT",
       "UID:fn-evento-" + id + "@comitati-treviso",
@@ -167,7 +197,7 @@
       "DTEND:" + toICSDate(end),
       "SUMMARY:" + icsEscape(ev.title)
     ];
-    if (ev.place) lines.push("LOCATION:" + icsEscape(ev.place));
+    if (luogoCompleto) lines.push("LOCATION:" + icsEscape(luogoCompleto));
     if (ev.description) lines.push("DESCRIPTION:" + icsEscape(ev.description));
     if (ev.lat != null && ev.lon != null) lines.push(`GEO:${ev.lat};${ev.lon}`);
     lines.push("END:VEVENT", "END:VCALENDAR");
@@ -186,25 +216,292 @@
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  // ---------------------------------------------------------------------
+  // Destinatari del target evento (tutti / un comune / selezione manuale).
+  // Confronto id con String() da entrambi i lati: eventi creati prima della
+  // migrazione a Firestore potrebbero avere id numerici salvati nell'array.
+  // ---------------------------------------------------------------------
   function targetContacts(target) {
-    const DATA = window.CONTACTS;
+    const DATA = window.FN_COMITATI.getAll();
     if (target.type === "all") return DATA;
     if (target.type === "city") return DATA.filter(d => d.city === target.value);
-    if (target.type === "selection") return DATA.filter(d => (target.value || []).includes(d.id));
+    if (target.type === "selection") {
+      const ids = (target.value || []).map(String);
+      return DATA.filter(d => ids.includes(String(d.id)));
+    }
     return [];
   }
+
+  function fmtDate(ev) {
+    if (!ev.date) return "";
+    const start = new Date(ev.date).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+    return ev.oraFine ? `${start} – ${ev.oraFine}` : start;
+  }
+
+  function luogoLabel(ev) {
+    return [ev.place, ev.comune && ev.provincia ? `${ev.comune} (${ev.provincia})` : ev.comune].filter(Boolean).join(" — ");
+  }
+
+  // ---------------------------------------------------------------------
+  // Checklist
+  // ---------------------------------------------------------------------
+  function renderChecklist(ev, id) {
+    const items = (ev.checklist && ev.checklist.length) ? ev.checklist : CHECKLIST_DEFAULT();
+    const rows = items.map((it, i) => `
+      <label class="checklist-item">
+        <input type="checkbox" data-idx="${i}" ${it.done ? "checked" : ""}>
+        <span${it.done ? ' class="done"' : ""}>${it.label}</span>
+      </label>`).join("");
+    return `
+      <div class="panel-body checklist" data-event="${id}">
+        ${rows}
+        <div class="checklist-add">
+          <input type="text" class="checklist-new-label" placeholder="Aggiungi voce…">
+          <button type="button" class="btn small checklist-add-btn">+ Aggiungi</button>
+        </div>
+      </div>`;
+  }
+
+  function wireChecklist(div, ev, id) {
+    const panel = div.querySelector(`.checklist[data-event="${id}"]`);
+    if (!panel) return;
+    const items = (ev.checklist && ev.checklist.length) ? ev.checklist.slice() : CHECKLIST_DEFAULT();
+    function save(newItems) {
+      window.db.collection(COLLECTION).doc(id).set({ checklist: newItems }, { merge: true });
+    }
+    panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener("change", () => {
+        const idx = Number(cb.dataset.idx);
+        items[idx].done = cb.checked;
+        save(items);
+      });
+    });
+    const addBtn = panel.querySelector(".checklist-add-btn");
+    const addInput = panel.querySelector(".checklist-new-label");
+    addBtn.addEventListener("click", () => {
+      const label = addInput.value.trim();
+      if (!label) return;
+      items.push({ label, done: false });
+      save(items);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Budget
+  // ---------------------------------------------------------------------
+  function renderBudget(ev, id) {
+    const b = ev.budget || {};
+    const num = v => (v == null ? "" : v);
+    return `
+      <div class="panel-body budget-grid" data-event="${id}">
+        <label>Budget richiesto (€)<input type="number" step="0.01" class="bg-previsto" value="${num(b.previsto)}"></label>
+        <label>Budget approvato (€)<input type="number" step="0.01" class="bg-approvato" value="${num(b.approvato)}"></label>
+        <label>Budget disponibile (€)<input type="number" step="0.01" class="bg-disponibile" value="${num(b.disponibile)}"></label>
+        <label>Spese effettive (€)<input type="number" step="0.01" class="bg-spese" value="${num(b.speseEffettive)}"></label>
+        <label style="grid-column:1/-1;">Note budget<textarea rows="2" class="bg-note">${b.note || ""}</textarea></label>
+        <button type="button" class="btn primary small budget-save" style="grid-column:1/-1;">💾 Salva budget</button>
+      </div>`;
+  }
+
+  function wireBudget(div, ev, id) {
+    const panel = div.querySelector(`.budget-grid[data-event="${id}"]`);
+    if (!panel) return;
+    panel.querySelector(".budget-save").addEventListener("click", () => {
+      const n = v => v === "" ? null : Number(v);
+      const budget = {
+        previsto: n(panel.querySelector(".bg-previsto").value),
+        approvato: n(panel.querySelector(".bg-approvato").value),
+        disponibile: n(panel.querySelector(".bg-disponibile").value),
+        speseEffettive: n(panel.querySelector(".bg-spese").value),
+        note: panel.querySelector(".bg-note").value
+      };
+      window.db.collection(COLLECTION).doc(id).set({ budget }, { merge: true });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Comitati coinvolti: vicini all'evento (per distanza) + gestione stato
+  // di partecipazione e attivita' assegnata di chi e' gia' stato coinvolto.
+  // ---------------------------------------------------------------------
+  function renderCoinvolti(ev, id) {
+    const partecipazioni = ev.partecipazioni || [];
+    const coinvoltiIds = new Set(partecipazioni.map(p => String(p.comitatoId)));
+
+    let viciniHtml;
+    if (ev.lat == null || ev.lon == null) {
+      viciniHtml = `<p class="detail empty" style="margin:0 0 10px;">Imposta un punto sulla mappa per questo evento (sopra, nel form) per vedere i comitati vicini.</p>`;
+    } else {
+      viciniHtml = `
+        <div class="vicini-filters">
+          <button type="button" class="btn small vicini-filter" data-km="10">Entro 10 km</button>
+          <button type="button" class="btn small vicini-filter active" data-km="25">Entro 25 km</button>
+          <button type="button" class="btn small vicini-filter" data-km="50">Entro 50 km</button>
+          <button type="button" class="btn small vicini-filter" data-km="provincia">Tutta la provincia</button>
+        </div>
+        <div class="vicini-list"></div>
+        <button type="button" class="btn primary small vicini-invita" style="margin-top:8px;">+ Invita selezionati</button>
+      `;
+    }
+
+    const partRows = partecipazioni.map((p, i) => {
+      const c = window.FN_COMITATI.getById(p.comitatoId);
+      const nome = c ? (c.ref || c.name) : `Comitato ${p.comitatoId}`;
+      return `
+        <div class="part-row" data-idx="${i}">
+          <span class="part-name">${nome}${c ? ` <small>(${c.city})</small>` : ""}</span>
+          <select class="part-stato">${PARTECIPAZIONE_STATI.map(s => `<option value="${s}" ${p.stato === s ? "selected" : ""}>${PARTECIPAZIONE_LABEL[s]}</option>`).join("")}</select>
+          <select class="part-attivita">
+            <option value="">— attività —</option>
+            ${ATTIVITA_OPTIONS.map(a => `<option value="${a}" ${p.attivita === a ? "selected" : ""}>${a}</option>`).join("")}
+          </select>
+          <button type="button" class="btn small part-remove" title="Rimuovi">✕</button>
+        </div>`;
+    }).join("");
+
+    return `
+      <div class="panel-body coinvolti" data-event="${id}">
+        ${viciniHtml}
+        <h4 class="panel-subtitle">Comitati coinvolti (${partecipazioni.length})</h4>
+        <div class="part-list">${partRows || '<p class="detail empty" style="margin:0;">Nessun comitato coinvolto ancora.</p>'}</div>
+        ${partecipazioni.length ? '<button type="button" class="btn small coinvolti-email">✉️ Email ai comitati coinvolti</button>' : ""}
+      </div>`;
+  }
+
+  function wireCoinvolti(div, ev, id) {
+    const panel = div.querySelector(`.coinvolti[data-event="${id}"]`);
+    if (!panel) return;
+    let partecipazioni = (ev.partecipazioni || []).slice();
+
+    function save(newPart) {
+      window.db.collection(COLLECTION).doc(id).set({ partecipazioni: newPart }, { merge: true });
+    }
+
+    function renderVicini(km) {
+      const listEl = panel.querySelector(".vicini-list");
+      if (!listEl) return;
+      const all = window.FN_COMITATI.getAll();
+      let candidates = window.FN_PROSSIMITA.nearestTo(ev.lat, ev.lon, all);
+      if (km === "provincia") {
+        candidates = candidates.filter(d => d.provincia === (ev.provincia || "Treviso"));
+      } else {
+        candidates = candidates.filter(d => d.distanceKm <= km);
+      }
+      const coinvoltiIds = new Set(partecipazioni.map(p => String(p.comitatoId)));
+      if (!candidates.length) {
+        listEl.innerHTML = '<p class="detail empty" style="margin:0;">Nessun comitato in questo raggio.</p>';
+        return;
+      }
+      listEl.innerHTML = candidates.map(d => `
+        <label class="vicino-row">
+          <input type="checkbox" value="${d.id}" ${coinvoltiIds.has(String(d.id)) ? "checked disabled" : ""}>
+          <span>${d.ref || d.name} <small>(${d.city} — ${d.distanceKm.toFixed(1)} km)</small></span>
+        </label>`).join("");
+    }
+
+    if (ev.lat != null && ev.lon != null) {
+      renderVicini(25);
+      panel.querySelectorAll(".vicini-filter").forEach(btn => {
+        btn.addEventListener("click", () => {
+          panel.querySelectorAll(".vicini-filter").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          const km = btn.dataset.km === "provincia" ? "provincia" : Number(btn.dataset.km);
+          renderVicini(km);
+        });
+      });
+      panel.querySelector(".vicini-invita").addEventListener("click", () => {
+        const checked = [...panel.querySelectorAll('.vicini-list input[type="checkbox"]:checked:not(:disabled)')].map(cb => cb.value);
+        if (!checked.length) { alert("Seleziona almeno un comitato da invitare."); return; }
+        checked.forEach(cid => partecipazioni.push({ comitatoId: cid, stato: "DA_INVITARE", attivita: "" }));
+        save(partecipazioni);
+      });
+    }
+
+    panel.querySelectorAll(".part-row").forEach(row => {
+      const idx = Number(row.dataset.idx);
+      row.querySelector(".part-stato").addEventListener("change", (e) => { partecipazioni[idx].stato = e.target.value; save(partecipazioni); });
+      row.querySelector(".part-attivita").addEventListener("change", (e) => { partecipazioni[idx].attivita = e.target.value; save(partecipazioni); });
+      row.querySelector(".part-remove").addEventListener("click", () => { partecipazioni.splice(idx, 1); save(partecipazioni); });
+    });
+
+    const emailBtn = panel.querySelector(".coinvolti-email");
+    if (emailBtn) {
+      emailBtn.addEventListener("click", () => {
+        const recipients = partecipazioni.map(p => window.FN_COMITATI.getById(p.comitatoId)).filter(Boolean);
+        window.FN_EMAIL.open({
+          title: `Email ai comitati coinvolti — ${ev.title}`,
+          recipients,
+          recipientsLabel: `A: ${recipients.length} comitati coinvolti nell'evento`,
+          subject: `Evento: ${ev.title}`,
+          body: `${ev.title}\n${fmtDate(ev)}${luogoLabel(ev) ? "\n" + luogoLabel(ev) : ""}\n\n${ev.description || ""}`
+        });
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Report post-evento
+  // ---------------------------------------------------------------------
+  function renderReport(ev, id) {
+    const r = ev.report || {};
+    return `
+      <div class="panel-body report-grid" data-event="${id}">
+        <label>Partecipanti effettivi<input type="number" class="rp-partecipanti" value="${r.partecipantiEffettivi ?? ""}"></label>
+        <label>Comitati presenti<input type="text" class="rp-comitati" value="${r.comitatiPresenti || ""}" placeholder="es. Roncade, Preganziol…"></label>
+        <label>Ospiti presenti<input type="text" class="rp-ospiti" value="${r.ospitiPresenti || ""}"></label>
+        <label style="grid-column:1/-1;">Risultato dell'evento<textarea rows="2" class="rp-risultato">${r.risultato || ""}</textarea></label>
+        <label style="grid-column:1/-1;">Problemi riscontrati<textarea rows="2" class="rp-problemi">${r.problemi || ""}</textarea></label>
+        <label style="grid-column:1/-1;">Nuovi contatti raccolti<textarea rows="2" class="rp-contatti">${r.nuoviContatti || ""}</textarea></label>
+        <label style="grid-column:1/-1;">Attività successive da fare<textarea rows="2" class="rp-successive">${r.attivitaSuccessive || ""}</textarea></label>
+        <label style="grid-column:1/-1;">Note<textarea rows="2" class="rp-note">${r.note || ""}</textarea></label>
+        <button type="button" class="btn primary small report-save" style="grid-column:1/-1;">💾 Salva report</button>
+      </div>`;
+  }
+
+  function wireReport(div, ev, id) {
+    const panel = div.querySelector(`.report-grid[data-event="${id}"]`);
+    if (!panel) return;
+    panel.querySelector(".report-save").addEventListener("click", () => {
+      const report = {
+        partecipantiEffettivi: panel.querySelector(".rp-partecipanti").value === "" ? null : Number(panel.querySelector(".rp-partecipanti").value),
+        comitatiPresenti: panel.querySelector(".rp-comitati").value,
+        ospitiPresenti: panel.querySelector(".rp-ospiti").value,
+        risultato: panel.querySelector(".rp-risultato").value,
+        problemi: panel.querySelector(".rp-problemi").value,
+        nuoviContatti: panel.querySelector(".rp-contatti").value,
+        attivitaSuccessive: panel.querySelector(".rp-successive").value,
+        note: panel.querySelector(".rp-note").value
+      };
+      window.db.collection(COLLECTION).doc(id).set({ report }, { merge: true });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Scheda evento
+  // ---------------------------------------------------------------------
+  function statoClass(stato) { return "stato-" + (stato || "bozza").toLowerCase(); }
 
   function renderEventCard(id, ev) {
     const div = document.createElement("div");
     div.className = "card event-card";
-    const dt = ev.date ? new Date(ev.date).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" }) : "";
+    const stato = ev.stato || "BOZZA";
     const targetLabel = ev.target.type === "all" ? "Tutti i comitati"
       : ev.target.type === "city" ? `Comune: ${ev.target.value}`
       : `${(ev.target.value || []).length} comitati selezionati`;
+
+    const panels = [
+      { key: "checklist", label: "📋 Checklist", render: renderChecklist, wire: wireChecklist },
+      { key: "budget", label: "💰 Budget", render: renderBudget, wire: wireBudget },
+      { key: "coinvolti", label: "🧑‍🤝‍🧑 Comitati coinvolti", render: renderCoinvolti, wire: wireCoinvolti },
+      { key: "report", label: "📝 Report evento", render: renderReport, wire: wireReport }
+    ];
+
     div.innerHTML = `
-      <h3>${ev.title}</h3>
-      <div class="meta">${dt}${ev.place ? " — " + ev.place : ""}</div>
-      <div><span class="target">${targetLabel}</span></div>
+      <div class="event-head">
+        <h3>${ev.title}</h3>
+        <span class="stato-badge ${statoClass(stato)}">${STATO_LABEL[stato] || stato}</span>
+      </div>
+      <div class="meta">${fmtDate(ev)}${luogoLabel(ev) ? " — " + luogoLabel(ev) : ""}${ev.tipologia ? " · " + ev.tipologia : ""}</div>
+      <div><span class="target">${targetLabel}</span>${ev.responsabile ? `<span class="target">Resp: ${ev.responsabile}</span>` : ""}</div>
       ${ev.poster ? `<img class="event-poster" src="${ev.poster}" alt="Locandina evento" title="Clicca per ingrandire">` : ""}
       <p style="font-size:13px;">${(ev.description || "").replace(/</g, "&lt;")}</p>
       ${ev.lat != null && ev.lon != null ? `
@@ -213,12 +510,37 @@
         <a class="btn small" target="_blank" href="https://maps.apple.com/?daddr=${ev.lat},${ev.lon}">📍 Apple Maps</a>
         <a class="btn small" target="_blank" href="https://waze.com/ul?ll=${ev.lat},${ev.lon}&navigate=yes">📍 Waze</a>
       </div>` : ""}
+      <div class="event-stato-change">
+        <label>Stato:</label>
+        <select class="ev-stato-select">${STATI_EVENTO.map(s => `<option value="${s}" ${s === stato ? "selected" : ""}>${STATO_LABEL[s]}</option>`).join("")}</select>
+      </div>
+      ${panels.map(p => `
+        <details class="event-panel" data-panel="${p.key}">
+          <summary>${p.label}</summary>
+          ${p.render(ev, id)}
+        </details>
+      `).join("")}
       <div class="detail actions">
         <button class="btn primary" data-action="notify">✉️ Invia notifica ai destinatari</button>
         <button class="btn" data-action="calendar">📅 Aggiungi al calendario</button>
         <button class="btn" data-action="delete">Elimina</button>
       </div>
     `;
+
+    // Ripristina lo stato aperto/chiuso dei pannelli e lo memorizza al toggle.
+    div.querySelectorAll(".event-panel").forEach(details => {
+      const key = `${id}:${details.dataset.panel}`;
+      if (openPanels.has(key)) details.open = true;
+      details.addEventListener("toggle", () => {
+        if (details.open) openPanels.add(key); else openPanels.delete(key);
+      });
+    });
+    panels.forEach(p => p.wire(div, ev, id));
+
+    div.querySelector(".ev-stato-select").addEventListener("change", (e) => {
+      window.db.collection(COLLECTION).doc(id).set({ stato: e.target.value }, { merge: true });
+    });
+
     if (ev.poster) {
       div.querySelector(".event-poster").addEventListener("click", () => openLightbox(ev.poster));
     }
@@ -227,11 +549,8 @@
       const recipients = targetContacts(ev.target);
       if (recipients.length === 0) { alert("Nessun destinatario per questo evento."); return; }
       const subject = `Evento: ${ev.title}`;
-      const body = `${ev.title}\n${dt}${ev.place ? "\nLuogo: " + ev.place : ""}\n\n${ev.description || ""}`
+      const body = `${ev.title}\n${fmtDate(ev)}${luogoLabel(ev) ? "\nLuogo: " + luogoLabel(ev) : ""}\n\n${ev.description || ""}`
         + (ev.poster ? "\n\n(Locandina disponibile nella scheda evento, tab Eventi dell'app.)" : "");
-      // Oggetto/testo sono già pronti (generati dai dati evento) ma restano
-      // modificabili prima dell'invio. Se EmailJS è configurato (vedi
-      // emailjs-config.js) parte sempre da comitatoroncade@gmail.com.
       window.FN_EMAIL.open({
         title: `Notifica evento: ${ev.title}`,
         recipients,
@@ -249,25 +568,62 @@
   function listenEvents() {
     const listEl = document.getElementById("events-list");
     window.db.collection(COLLECTION).orderBy("date", "asc").onSnapshot(snap => {
+      allEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       listEl.innerHTML = "";
-      if (snap.empty) { listEl.innerHTML = '<p class="detail empty">Nessun evento ancora.</p>'; return; }
-      snap.forEach(doc => listEl.appendChild(renderEventCard(doc.id, doc.data())));
+      if (snap.empty) { listEl.innerHTML = '<p class="detail empty">Nessun evento ancora.</p>'; }
+      else snap.forEach(doc => listEl.appendChild(renderEventCard(doc.id, doc.data())));
+      if (window.FN_DASHBOARD) window.FN_DASHBOARD.refresh();
+      if (window.FN_CALENDARIO) window.FN_CALENDARIO.refresh();
     }, err => {
       listEl.innerHTML = `<div class="notice error">Errore lettura eventi: ${err.message}</div>`;
     });
   }
 
-  function initForm() {
-    const cityByName = [...new Set(window.CONTACTS.map(d => d.city))].sort();
+  function populateSelectOptions() {
+    const tipoSel = document.getElementById("ev-tipologia");
+    if (tipoSel && !tipoSel.dataset.filled) {
+      TIPOLOGIE.forEach(t => { const o = document.createElement("option"); o.value = t; o.textContent = t; tipoSel.appendChild(o); });
+      tipoSel.dataset.filled = "1";
+    }
+    const statoSel = document.getElementById("ev-stato-iniziale");
+    if (statoSel && !statoSel.dataset.filled) {
+      STATI_EVENTO.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = STATO_LABEL[s]; statoSel.appendChild(o); });
+      statoSel.dataset.filled = "1";
+    }
+    const orgSel = document.getElementById("ev-organizzatore");
+    if (orgSel) {
+      const current = orgSel.value;
+      orgSel.innerHTML = '<option value="">— nessuno specifico —</option>';
+      window.FN_COMITATI.getAll().slice().sort((a, b) => a.city.localeCompare(b.city)).forEach(c => {
+        const o = document.createElement("option");
+        o.value = c.id; o.textContent = `${c.city} — ${c.ref || c.name}`;
+        orgSel.appendChild(o);
+      });
+      if (current) orgSel.value = current;
+    }
+    // Il comune per il target "un comune specifico" dipende dai comitati
+    // caricati: su Firestore arrivano in modo asincrono, quindi questa
+    // funzione va richiamata a ogni aggiornamento dati (vedi onChange sotto),
+    // non solo una volta al bootstrap.
     const citySelect = document.getElementById("ev-target-city");
-    cityByName.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c; opt.textContent = c;
-      citySelect.appendChild(opt);
-    });
+    if (citySelect) {
+      const current = citySelect.value;
+      citySelect.innerHTML = "";
+      [...new Set(window.FN_COMITATI.getAll().map(d => d.city))].sort().forEach(c => {
+        const o = document.createElement("option"); o.value = c; o.textContent = c; citySelect.appendChild(o);
+      });
+      if (current) citySelect.value = current;
+    }
+  }
+
+  function initForm() {
+    const citySelect = document.getElementById("ev-target-city");
     document.getElementById("ev-target-type").addEventListener("change", (e) => {
       citySelect.style.display = e.target.value === "city" ? "block" : "none";
     });
+
+    populateSelectOptions();
+    window.FN_COMITATI.onChange(populateSelectOptions);
 
     let posterData = null;
     const posterInput = document.getElementById("ev-poster");
@@ -297,12 +653,32 @@
         ? { type: "selection", value: window.FN_RUBRICA.getSelectedContacts().map(d => d.id) }
         : { type: "all" };
 
+      const numOrNull = v => v === "" ? null : Number(v);
       const ev = {
         title: document.getElementById("ev-title").value,
+        tipologia: document.getElementById("ev-tipologia").value,
         date: document.getElementById("ev-date").value,
+        oraFine: document.getElementById("ev-ora-fine").value || null,
         place: document.getElementById("ev-place").value,
+        indirizzo: document.getElementById("ev-indirizzo").value,
+        comune: document.getElementById("ev-comune").value,
+        provincia: document.getElementById("ev-provincia").value || "Treviso",
         lat: evLat, lon: evLon,
         description: document.getElementById("ev-desc").value,
+        responsabile: document.getElementById("ev-responsabile").value,
+        comitatoOrganizzatore: document.getElementById("ev-organizzatore").value || null,
+        budget: {
+          previsto: numOrNull(document.getElementById("ev-budget-previsto").value),
+          approvato: null, disponibile: null, speseEffettive: null, note: ""
+        },
+        ospiti: document.getElementById("ev-ospiti").value,
+        partecipantiPrevisti: numOrNull(document.getElementById("ev-partecipanti-previsti").value),
+        materiali: document.getElementById("ev-materiali").value,
+        note: document.getElementById("ev-note").value,
+        stato: document.getElementById("ev-stato-iniziale").value || "BOZZA",
+        checklist: CHECKLIST_DEFAULT(),
+        partecipazioni: [],
+        report: null,
         poster: posterData || null,
         target,
         createdBy: window.FN_APP.whoami() || "anonimo",
@@ -331,6 +707,16 @@
     // non puo' inizializzarsi correttamente mentre e' nascosta (dimensioni 0x0).
     onShow() {
       try { initPickerMap(); } catch (e) { console.error("[FN] Errore mappa punto evento:", e); }
-    }
+    },
+    getAll() { return allEvents.slice(); },
+    getForComitato(comitatoId) {
+      const cid = String(comitatoId);
+      return allEvents.filter(ev =>
+        String(ev.comitatoOrganizzatore) === cid ||
+        (ev.partecipazioni || []).some(p => String(p.comitatoId) === cid) ||
+        (ev.target && ev.target.type === "selection" && (ev.target.value || []).map(String).includes(cid))
+      );
+    },
+    STATI_EVENTO, STATO_LABEL, TIPOLOGIE
   };
 })();

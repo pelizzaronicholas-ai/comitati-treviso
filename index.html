@@ -19,7 +19,7 @@
   <img class="logo" id="app-logo" src="assets/logo-fn.png" alt="Logo Futuro Nazionale">
   <div class="titles">
     <h1>Comitati di TREVISO</h1>
-    <p>Rete dei comitati territoriali Futuro Nazionale — Provincia di Treviso</p>
+    <p>Piattaforma di coordinamento dei comitati territoriali Futuro Nazionale</p>
   </div>
   <div class="whoami">
     <span>Sei:</span>
@@ -28,12 +28,19 @@
 </header>
 
 <nav class="tabs">
-  <button class="tab-btn active" data-tab="mappa">Mappa &amp; Rubrica</button>
+  <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+  <button class="tab-btn" data-tab="comitati">Comitati</button>
   <button class="tab-btn" data-tab="eventi">Eventi</button>
+  <button class="tab-btn" data-tab="calendario">Calendario</button>
 </nav>
 
-<!-- ===================== TAB: MAPPA & RUBRICA ===================== -->
-<section class="tab-panel active" id="tab-mappa">
+<!-- ===================== TAB: DASHBOARD ===================== -->
+<section class="tab-panel active" id="tab-dashboard">
+  <div id="dashboard-content" class="dash-container"></div>
+</section>
+
+<!-- ===================== TAB: COMITATI (mappa + rubrica) ===================== -->
+<section class="tab-panel" id="tab-comitati">
   <div class="layout">
     <div id="detail" class="card detail empty" style="flex:1 1 100%;">
       Seleziona un comitato dalla lista o dalla mappa per vedere i dettagli.
@@ -44,14 +51,22 @@
     <div class="list-panel card">
       <div class="list-toolbar">
         <input type="search" id="search-box" placeholder="Cerca comune o referente…">
+        <select id="filter-provincia" title="Filtra per provincia"><option value="">Tutte le province</option></select>
+        <select id="filter-stato" title="Filtra per stato">
+          <option value="">Tutti gli stati</option>
+          <option value="attivo">Attivo</option>
+          <option value="inattivo">Inattivo</option>
+          <option value="in_costituzione">In costituzione</option>
+        </select>
       </div>
       <div id="list"></div>
       <div class="bulkbar">
         <span class="count" id="sel-count">0 selezionati</span>
-        <button class="btn" id="sel-all">Seleziona tutti</button>
+        <button class="btn" id="sel-all">Seleziona tutti (visibili)</button>
         <button class="btn" id="sel-none">Deseleziona</button>
         <button class="btn primary" id="bulk-email">✉️ Email ai selezionati</button>
         <button class="btn accent" id="bulk-wa">WhatsApp ai selezionati</button>
+        <button class="btn" id="comitato-new">+ Nuovo comitato</button>
       </div>
     </div>
   </div>
@@ -61,16 +76,29 @@
 <section class="tab-panel" id="tab-eventi">
   <div id="eventi-fb-notice"></div>
   <div class="layout">
-    <div class="card" style="flex:1 1 320px;">
+    <div class="card" style="flex:1 1 360px;">
       <h3 style="margin-top:0;">Nuovo evento</h3>
       <form class="stack" id="event-form">
+        <div class="form-section-title">Informazioni di base</div>
         <label>Titolo</label>
         <input type="text" id="ev-title" required placeholder="Es. Presidio in piazza">
-        <label>Data e ora</label>
-        <input type="datetime-local" id="ev-date" required>
-        <label>Luogo</label>
-        <input type="text" id="ev-place" placeholder="Es. Piazza dei Signori, Treviso">
-        <label>Punto esatto sulla mappa (facoltativo, serve per le indicazioni stradali)</label>
+        <label>Tipologia</label>
+        <select id="ev-tipologia"></select>
+        <div class="form-row">
+          <div><label>Data e ora inizio</label><input type="datetime-local" id="ev-date" required></div>
+          <div><label>Ora fine (opzionale)</label><input type="time" id="ev-ora-fine"></div>
+        </div>
+
+        <div class="form-section-title">Luogo</div>
+        <label>Luogo (nome del posto)</label>
+        <input type="text" id="ev-place" placeholder="Es. Piazza dei Signori">
+        <label>Indirizzo (opzionale)</label>
+        <input type="text" id="ev-indirizzo" placeholder="Es. Via Calmaggiore 12">
+        <div class="form-row">
+          <div><label>Comune</label><input type="text" id="ev-comune" placeholder="Es. Treviso"></div>
+          <div><label>Provincia</label><input type="text" id="ev-provincia" value="Treviso"></div>
+        </div>
+        <label>Punto esatto sulla mappa (facoltativo, serve per le indicazioni stradali e i comitati vicini)</label>
         <div class="geo-search">
           <input type="text" id="ev-geo-search" placeholder="Cerca un indirizzo…">
           <button type="button" class="btn small" id="ev-geo-search-btn">Cerca</button>
@@ -78,18 +106,39 @@
         <div id="ev-map-picker"></div>
         <div class="geo-status" id="ev-geo-status">Nessun punto impostato — clicca sulla mappa o cerca un indirizzo.</div>
         <button type="button" class="btn small" id="ev-geo-clear" style="display:none;align-self:flex-start;">Rimuovi punto</button>
+
+        <div class="form-section-title">Organizzazione</div>
         <label>Descrizione</label>
         <textarea id="ev-desc" rows="3" placeholder="Dettagli per i referenti…"></textarea>
-        <label>Destinatari</label>
+        <div class="form-row">
+          <div><label>Responsabile evento</label><input type="text" id="ev-responsabile" placeholder="Nome referente"></div>
+          <div><label>Comitato organizzatore</label><select id="ev-organizzatore"></select></div>
+        </div>
+        <label>Destinatari della notifica</label>
         <select id="ev-target-type">
           <option value="all">Tutti i comitati</option>
           <option value="city">Un comune specifico</option>
-          <option value="selection">Solo i comitati selezionati in Rubrica</option>
+          <option value="selection">Solo i comitati selezionati in Comitati</option>
         </select>
         <select id="ev-target-city" style="display:none;"></select>
         <label>Locandina (opzionale)</label>
         <input type="file" id="ev-poster" accept="image/*">
         <img id="ev-poster-preview" alt="Anteprima locandina">
+
+        <div class="form-section-title">Numeri, materiali e budget</div>
+        <div class="form-row">
+          <div><label>Partecipanti previsti</label><input type="number" min="0" id="ev-partecipanti-previsti"></div>
+          <div><label>Ospiti</label><input type="text" id="ev-ospiti" placeholder="Nomi ospiti, se previsti"></div>
+        </div>
+        <label>Materiali necessari</label>
+        <textarea id="ev-materiali" rows="2" placeholder="Gazebo, volantini, microfono…"></textarea>
+        <label>Budget richiesto (€, opzionale)</label>
+        <input type="number" min="0" step="0.01" id="ev-budget-previsto">
+        <label>Note</label>
+        <textarea id="ev-note" rows="2"></textarea>
+        <label>Stato iniziale</label>
+        <select id="ev-stato-iniziale"></select>
+
         <button type="submit" class="btn primary">Crea evento</button>
       </form>
     </div>
@@ -97,6 +146,44 @@
       <h3 style="margin-top:0;">Eventi in programma</h3>
       <div id="events-list"><p class="detail empty">Nessun evento ancora.</p></div>
     </div>
+  </div>
+</section>
+
+<!-- ===================== TAB: CALENDARIO ===================== -->
+<section class="tab-panel" id="tab-calendario">
+  <div class="card cal-filters">
+    <select id="cal-filter-provincia"><option value="">Tutte le province</option></select>
+    <select id="cal-filter-comune"><option value="">Tutti i comuni</option></select>
+    <select id="cal-filter-comitato"><option value="">Tutti i comitati organizzatori</option></select>
+    <input type="text" id="cal-filter-responsabile" placeholder="Responsabile…">
+    <select id="cal-filter-stato"><option value="">Tutti gli stati</option></select>
+    <select id="cal-filter-tipologia"><option value="">Tutte le tipologie</option></select>
+  </div>
+  <div class="cal-toolbar">
+    <div class="cal-view-toggle">
+      <button type="button" class="btn small active" id="cal-view-mese">Mese</button>
+      <button type="button" class="btn small" id="cal-view-agenda">Agenda</button>
+    </div>
+    <div class="cal-nav" id="calendar-month-view-nav">
+      <button type="button" class="btn small" id="cal-prev">◀</button>
+      <button type="button" class="btn small" id="cal-today">Oggi</button>
+      <button type="button" class="btn small" id="cal-next">▶</button>
+      <span id="calendar-month-label" class="cal-month-label"></span>
+    </div>
+  </div>
+  <div id="calendar-month-view">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="cal-weekdays">
+        <span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span>
+      </div>
+      <div class="cal-grid" id="calendar-grid"></div>
+    </div>
+    <div class="card" id="calendar-day-detail" style="margin-top:14px;">
+      <p class="detail empty">Clicca un giorno con eventi per vederne i dettagli.</p>
+    </div>
+  </div>
+  <div id="calendar-agenda-view" class="card" style="display:none;">
+    <div id="calendar-agenda"></div>
   </div>
 </section>
 
@@ -117,6 +204,48 @@
   </div>
 </div>
 
+<!-- ===================== FINESTRA MODIFICA/CREAZIONE COMITATO ===================== -->
+<div class="fn-modal-overlay" id="comitato-modal" style="display:none;">
+  <div class="fn-modal card" style="max-width:560px;">
+    <h3 id="comitato-modal-title">Modifica comitato</h3>
+    <form class="stack" id="comitato-form">
+      <label>Nome comitato</label>
+      <input type="text" id="cm-name" required>
+      <div class="form-row">
+        <div><label>Comune</label><input type="text" id="cm-city" required></div>
+        <div><label>Provincia</label><input type="text" id="cm-provincia"></div>
+      </div>
+      <label>Indirizzo/zona (opzionale)</label>
+      <input type="text" id="cm-indirizzo">
+      <div class="form-row">
+        <div><label>Referente</label><input type="text" id="cm-ref"></div>
+        <div><label>Secondo referente (opzionale)</label><input type="text" id="cm-ref2"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Telefono</label><input type="text" id="cm-tel"></div>
+        <div><label>Email</label><input type="email" id="cm-email"></div>
+      </div>
+      <label>Stato</label>
+      <select id="cm-stato">
+        <option value="attivo">Attivo</option>
+        <option value="inattivo">Inattivo</option>
+        <option value="in_costituzione">In costituzione</option>
+      </select>
+      <div class="form-row">
+        <div><label>Latitudine (opzionale)</label><input type="text" id="cm-lat" placeholder="es. 45.6479"></div>
+        <div><label>Longitudine (opzionale)</label><input type="text" id="cm-lon" placeholder="es. 12.3596"></div>
+      </div>
+      <label>Note</label>
+      <textarea id="cm-note" rows="2"></textarea>
+      <div class="email-modal-status" id="comitato-modal-status"></div>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="comitato-modal-save">💾 Salva</button>
+        <button type="button" class="btn" id="comitato-modal-cancel">Annulla</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Leaflet (mappa con basemap OpenStreetMap reale) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -130,10 +259,14 @@
 <script src="data.js"></script>
 <script src="firebase-config.js"></script>
 <script src="emailjs-config.js"></script>
+<script src="comitati-data.js"></script>
+<script src="prossimita.js"></script>
 <script src="email-sender.js"></script>
 <script src="map.js"></script>
 <script src="rubrica.js"></script>
 <script src="eventi.js"></script>
+<script src="dashboard.js"></script>
+<script src="calendario.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

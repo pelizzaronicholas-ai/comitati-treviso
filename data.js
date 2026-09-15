@@ -1,7 +1,12 @@
 // Dati di riferimento: 27 comitati Futuro Nazionale, provincia di Treviso.
 // Fonte: mappa pubblica futuronazionale.it/comitati/ (13/09/2026).
-// Questo file e' la "verita'" statica dei contatti: non richiede Firestore
-// per essere letto, cambia raramente e non deve costare letture a ogni avvio.
+// Dal 15/09/2026 questo file non e' piu' l'unica fonte: e' il seed iniziale
+// (usato una sola volta per popolare Firestore, vedi comitati-data.js) e il
+// fallback in sola lettura se Firebase non e' configurato o raggiungibile.
+// La fonte "viva" e modificabile da interfaccia e' la collection Firestore
+// "comitati_treviso". Non modificare i valori qui sotto per correggere un
+// comitato: usa la scheda di modifica nell'app (scrive su Firestore) — questo
+// file cambia solo se serve aggiornare anche il fallback offline.
 window.CONTACTS = [
   { id: 149,  name: "Comitato Castelfranco Veneto 149",   city: "Castelfranco Veneto",   ref: "Giovanni D'Aprile",          email: "gio.roxi45@gmail.com",              tel: "3277975266", lat: 45.6599492, lon: 11.9118705 },
   { id: 1047, name: "Comitato Castelfranco Veneto 1047",  city: "Castelfranco Veneto",   ref: "Matteo Gravina",             email: "matteo.gravina96@gmail.com",        tel: "3515574156", lat: 45.679218,  lon: 11.9255956 },

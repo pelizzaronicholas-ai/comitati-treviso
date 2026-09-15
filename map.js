@@ -1,12 +1,11 @@
-// Mappa reale con basemap OpenStreetMap (Leaflet), non piu' una proiezione
-// SVG "fatta in casa" su sfondo bianco: qui il territorio si vede per davvero,
-// con zoom/pan nativi. I tile OSM li carica il browser di chi visita il sito
-// (rete pubblica, nessun limite lato nostro).
+// Mappa reale con basemap OpenStreetMap (Leaflet). Non possiede piu' i dati:
+// li riceve da chi la usa (rubrica.js, che applica anche i filtri) tramite
+// renderMarkers(data), cosi' mappa e lista restano sempre sincronizzate sullo
+// stesso sottoinsieme filtrato di comitati.
 (function () {
-  const DATA = window.CONTACTS;
   let map = null;
   let activeId = null;
-  const markers = {};
+  let markers = {};
 
   function icon(active) {
     return L.divIcon({
@@ -28,19 +27,27 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    DATA.forEach(d => {
-      const m = L.marker([d.lat, d.lon], { icon: icon(false) }).addTo(map);
+    // Il container puo' avere dimensioni sbagliate se calcolate mentre il tab
+    // non era ancora visibile: ricalcola dopo il primo render.
+    setTimeout(() => map.invalidateSize(), 200);
+  }
+
+  // data: array di comitati (gia' filtrati da chi chiama) con lat/lon.
+  function renderMarkers(data) {
+    if (!map) return; // il tab Comitati non e' ancora stato mostrato
+    Object.values(markers).forEach(m => map.removeLayer(m));
+    markers = {};
+    const withCoords = data.filter(d => d.lat != null && d.lon != null);
+    withCoords.forEach(d => {
+      const m = L.marker([d.lat, d.lon], { icon: icon(d.id === activeId) }).addTo(map);
       m.bindTooltip(`<b>${d.city}</b><br>${d.ref || "referente n.d."}`, { direction: "top", offset: [0, -10] });
       m.on("click", () => window.FN_APP.select(d.id));
       markers[d.id] = m;
     });
-
-    const bounds = L.latLngBounds(DATA.map(d => [d.lat, d.lon]));
-    map.fitBounds(bounds.pad(0.18));
-
-    // Il container puo' avere dimensioni sbagliate se calcolate mentre il tab
-    // non era ancora visibile: ricalcola dopo il primo render.
-    setTimeout(() => map.invalidateSize(), 200);
+    if (withCoords.length) {
+      const bounds = L.latLngBounds(withCoords.map(d => [d.lat, d.lon]));
+      map.fitBounds(bounds.pad(0.18));
+    }
   }
 
   function setActive(id) {
@@ -53,5 +60,5 @@
     }
   }
 
-  window.FN_MAP = { render, setActive };
+  window.FN_MAP = { render, renderMarkers, setActive };
 })();
